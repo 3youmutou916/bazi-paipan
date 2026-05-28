@@ -1,0 +1,19 @@
+{
+  "name": "四柱八字排盘 · 命理分析",
+  "short_name": "八字排盘",
+  "description": "传统四柱八字命理排盘分析工具 — 日主旺衰、五行平衡、大运流年、AI命理解读",
+  "start_url": "./demo.html",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f0c09",
+  "theme_color": "#0f0c09",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
