@@ -875,7 +875,93 @@ function formatBaziResult(result) {
 // ===== 流年计算 =====
 function calcLiuNian(year) {
   const index = ((year - 4) % 60 + 60) % 60;
-  return { ganZhi: GAN_ZHI_60[index], gan: TIAN_GAN[index % 10], zhi: DI_ZHI[index % 12] };
+  return { ganZhi: GAN_ZHI_60[index], gan: TIAN_GAN[index % 10], zhi: DI_ZHI[index % 12], index };
+}
+
+// 地支关系
+const ZHI_LIU_HE = { '子':'丑','丑':'子','寅':'亥','亥':'寅','卯':'戌','戌':'卯','辰':'酉','酉':'辰','巳':'申','申':'巳','午':'未','未':'午' };
+const ZHI_LIU_CHONG = { '子':'午','午':'子','丑':'未','未':'丑','寅':'申','申':'寅','卯':'酉','酉':'卯','辰':'戌','戌':'辰','巳':'亥','亥':'巳' };
+const ZHI_LIU_HAI = { '子':'未','未':'子','丑':'午','午':'丑','寅':'巳','巳':'寅','卯':'辰','辰':'卯','申':'亥','亥':'申','酉':'戌','戌':'酉' };
+
+function getZhiRelationDesc(liuNianZhi, yearZhi, dayZhi) {
+  const tags = [];
+  if (ZHI_LIU_HE[liuNianZhi] === yearZhi) tags.push('合年支');
+  if (ZHI_LIU_HE[liuNianZhi] === dayZhi) tags.push('合日支');
+  if (ZHI_LIU_CHONG[liuNianZhi] === yearZhi) tags.push('冲年支');
+  if (ZHI_LIU_CHONG[liuNianZhi] === dayZhi) tags.push('冲日支');
+  if (ZHI_LIU_HAI[liuNianZhi] === yearZhi) tags.push('害年支');
+  if (ZHI_LIU_HAI[liuNianZhi] === dayZhi) tags.push('害日支');
+  return tags.length > 0 ? tags.join('·') : '—';
+}
+
+function getLiunianFortuneTag(liuNianGan, riGan) {
+  const shiShen = calcShiShen(riGan, liuNianGan);
+  const good = ['正印','偏印','正财','正官','食神'];
+  const bad = ['七杀','偏财','伤官','劫财'];
+  if (good.includes(shiShen)) return { tag: '吉', cls: 'good' };
+  if (bad.includes(shiShen)) return { tag: '平', cls: 'neutral' };
+  return { tag: '平', cls: 'neutral' };
+}
+
+// ===== 佩戴建议计算 =====
+function calcCharmsRecommendation(r) {
+  const wc = r.wuxingCount;
+  const dm = r.dayMaster;
+  const sheng = { '木':'火','火':'土','土':'金','金':'水','水':'木' };
+  const ke = { '木':'土','土':'水','水':'火','火':'金','金':'木' };
+  const shengWo = {}; for (const [k, v] of Object.entries(sheng)) { if (!shengWo[v]) shengWo[v] = []; shengWo[v].push(k); }
+  const keWo = {}; for (const [k, v] of Object.entries(ke)) { if (!keWo[v]) keWo[v] = []; keWo[v].push(k); }
+
+  // 五行强弱分布
+  const elements = ['木','火','土','金','水'];
+  const counts = elements.map(e => wc[e] || 0);
+  const maxCount = Math.max(...counts);
+  const minCount = Math.min(...counts);
+  const total = counts.reduce((a, b) => a + b, 0) || 8;
+  const avg = total / 5;
+
+  const weak = elements.filter(e => (wc[e] || 0) < 2);
+  const strong = elements.filter(e => (wc[e] || 0) >= 3);
+
+  const riWx = dm.wuxing;
+  const riCount = wc[riWx] || 0;
+
+  // 判断用神方向
+  let yongShen = [];
+  let yongReason = '';
+  if (riCount >= 4) {
+    // 身强 → 克泄耗
+    yongShen = [ke[riWx], sheng[riWx], keWo[riWx] ? keWo[riWx][0] : null].filter(Boolean);
+    yongReason = '日主身强，宜克泄耗';
+  } else if (riCount <= 2) {
+    // 身弱 → 生扶
+    yongShen = [shengWo[riWx] ? shengWo[riWx][0] : null, riWx].filter(Boolean);
+    yongReason = '日主偏弱，宜生扶';
+  } else {
+    yongShen = weak.length > 0 ? weak : [sheng[riWx]];
+    yongReason = '日主中和，补缺为上';
+  }
+
+  const charmMap = {
+    '木': { color: '绿色/青色', crystals: '翡翠、绿松石、孔雀石', items: '木质手串、葫芦挂件、绿植盆栽', direction: '东方', zodiac: '虎兔相关饰品', desc: '增强生机活力，助长运势' },
+    '火': { color: '红色/紫色', crystals: '红玛瑙、石榴石、紫水晶', items: '红绳手链、灯笼摆件、电子灯光', direction: '南方', zodiac: '蛇马相关饰品', desc: '增强热情与人缘，提升光明能量' },
+    '土': { color: '黄色/棕色', crystals: '黄水晶、蜜蜡、金发晶', items: '陶瓷摆件、泰山石敢当、五帝钱', direction: '中央', zodiac: '龙狗牛羊饰品', desc: '增强稳定与财运，厚重承载' },
+    '金': { color: '白色/金色', crystals: '白水晶、月光石、银饰', items: '金属摆件、铜钱葫芦、金元宝', direction: '西方', zodiac: '猴鸡相关饰品', desc: '增强决断力与贵气，辟邪护身' },
+    '水': { color: '黑色/蓝色', crystals: '黑曜石、海蓝宝、青金石', items: '水景摆件、鱼缸、黑曜石貔貅', direction: '北方', zodiac: '鼠猪相关饰品', desc: '增强智慧与财运，源远流长' }
+  };
+
+  const primaryEl = yongShen[0];
+  const secondaryEl = yongShen[1] || yongShen[0];
+
+  return {
+    yongReason,
+    yongShen: primaryEl,
+    weakElements: weak,
+    strongElements: strong,
+    primary: charmMap[primaryEl],
+    secondary: charmMap[secondaryEl],
+    charmMap
+  };
 }
 
 // ===== 主流程 =====
@@ -1008,7 +1094,80 @@ function renderResult(r) {
         </table>
       </div>
 
-      <!-- 4. 命理解读（全宽）-->
+      <!-- 4. 流年运势 -->
+      <div class="card result-card span-2">
+        <h3>流 年 运 势</h3>
+        <table>
+          <tr><th>年份</th><th>流年干支</th><th>纳音</th><th>天干十神</th><th>与命局关系</th><th>运势</th></tr>
+          ${(() => {
+            const currentYear = new Date().getFullYear();
+            let rows = '';
+            for (let offset = 0; offset < 6; offset++) {
+              const yr = currentYear + offset;
+              const ln = calcLiuNian(yr);
+              const shiShen = calcShiShen(r.dayMaster.gan, ln.gan);
+              const relation = getZhiRelationDesc(ln.zhi, p.year.zhi, p.day.zhi);
+              const fortune = getLiunianFortuneTag(ln.gan, r.dayMaster.gan);
+              const naYinVal = getNaYin(ln.index);
+              const isThisYear = offset === 0;
+              return rows + `<tr class="${isThisYear ? 'current-row' : ''}">
+                <td style="font-weight:${isThisYear ? 'bold' : 'normal'};color:${isThisYear ? 'var(--gold-bright)' : 'var(--text)'}">${yr}年${isThisYear ? ' ←今年' : ''}</td>
+                <td style="font-family:var(--font-display);font-size:1.15em;color:var(--text-bright)">${ln.ganZhi}</td>
+                <td style="color:#78a8c8;font-size:0.82em">${naYinVal}</td>
+                <td style="color:var(--gold);font-size:0.85em">${shiShen}</td>
+                <td style="color:${relation === '—' ? 'var(--text-dim)' : '#d4a870'};font-size:0.82em">${relation}</td>
+                <td><span style="display:inline-block;padding:2px 10px;border-radius:2px;font-size:0.78em;${fortune.tag==='吉'?'background:rgba(90,158,124,0.15);color:#90c8a8':''}${fortune.tag==='平'?'background:rgba(200,160,60,0.12);color:var(--gold)':''}${fortune.tag==='凶'?'background:rgba(180,60,40,0.12);color:#d89080':''}">${fortune.tag}</span></td>
+              </tr>`;
+            }
+          })()}
+        </table>
+        <div style="margin-top:12px;font-size:0.72em;color:var(--text-dim);line-height:1.8">
+          · 六合/六冲/六害以年支日支为准 · 天干十神取流年天干对日主 ·
+          <br>· 冲年支主环境变动 · 合日支主感情人际 ·
+        </div>
+      </div>
+
+      <!-- 5. 佩戴摆件建议 -->
+      <div class="card result-card span-2">
+        <h3>建 议 佩 戴 / 摆 件</h3>
+        ${(() => {
+          const ch = calcCharmsRecommendation(r);
+          return `
+          <div style="text-align:center;margin-bottom:16px;font-size:0.85em;color:var(--text-dim)">
+            ${ch.yongReason}，用神为 <b style="color:var(--gold-bright);font-size:1.1em">${ch.yongShen}</b>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div style="background:rgba(200,160,60,0.03);padding:16px;border:1px solid rgba(200,160,60,0.08)">
+              <div style="color:var(--gold-bright);font-size:0.9em;margin-bottom:10px;letter-spacing:3px;font-family:var(--font-display)">🔮 主要推荐（${ch.yongShen}）</div>
+              <div style="font-size:0.82em;line-height:2.2;color:var(--text)">
+                <div>🎨 幸运色：<b style="color:var(--gold)">${ch.primary.color}</b></div>
+                <div>💎 水晶宝石：<b style="color:var(--gold)">${ch.primary.crystals}</b></div>
+                <div>📿 佩戴摆件：<b style="color:var(--gold)">${ch.primary.items}</b></div>
+                <div>🧭 吉祥方位：<b style="color:var(--gold)">${ch.primary.direction}</b></div>
+                <div>🐉 生肖饰品：<b style="color:var(--gold)">${ch.primary.zodiac}</b></div>
+              </div>
+              <div style="margin-top:8px;font-size:0.75em;color:var(--text-dim);font-style:italic">${ch.primary.desc}</div>
+            </div>
+            <div style="background:rgba(200,160,60,0.02);padding:16px;border:1px solid rgba(200,160,60,0.06)">
+              <div style="color:var(--gold);font-size:0.9em;margin-bottom:10px;letter-spacing:3px;font-family:var(--font-display)">✨ 辅助推荐（${ch.secondary && ch.secondary !== ch.yongShen ? ch.secondary : '同元素'})</div>
+              <div style="font-size:0.82em;line-height:2.2;color:var(--text)">
+                <div>🎨 辅助色：<b style="color:var(--gold)">${ch.secondary.color}</b></div>
+                <div>💎 辅助宝石：<b style="color:var(--gold)">${ch.secondary.crystals}</b></div>
+                <div>📿 辅助摆件：<b style="color:var(--gold)">${ch.secondary.items}</b></div>
+                <div>🧭 辅助方位：<b style="color:var(--gold)">${ch.secondary.direction}</b></div>
+              </div>
+            </div>
+          </div>
+          ${ch.weakElements.length > 0 ? `
+          <div style="margin-top:14px;padding:12px;background:rgba(160,60,40,0.05);border:1px solid rgba(200,80,50,0.1);font-size:0.78em;color:var(--text-dim);line-height:1.8">
+            ⚡ 五行提点：命局中 <b style="color:#d89080">${ch.weakElements.join('、')}</b> 偏弱，${ch.strongElements.length > 0 ? `<b style="color:var(--gold)">${ch.strongElements.join('、')}</b> 偏旺` : ''}。日常可多用 <b style="color:var(--gold)">${ch.primary.color}</b> 衣物饰品，佩戴 <b style="color:var(--gold)">${ch.primary.crystals}</b> 调和气场。
+          </div>` : ''}
+          <div style="margin-top:12px;font-size:0.7em;color:var(--text-dim);text-align:center">以上建议基于命局五行推演，仅供参考</div>
+          `;
+        })()}
+      </div>
+
+      <!-- 6. 命理解读（全宽）-->
       <div class="card result-card ai-card span-2" id="aiCard">
         <h3>命 理 解 读</h3>
         <div id="aiContent">
@@ -1154,7 +1313,21 @@ ${currentDY ? `\n👉 当前正处第${currentDY.step}步大运：${currentDY.ga
 ### 五、当前流年大运分析
 结合当前${currentYear}年${thisLN.ganZhi}流年、来年${currentYear + 1}年${nextLN.ganZhi}流年以及当前大运${currentDY ? currentDY.ganZhi : '未知'}，分析近期运势重点和注意事项。
 
-### 六、综合建议
+### 六、逐流年运势详批
+请对当前${currentYear}年至${currentYear + 5}年共6个流年分别解读：
+- 每个流年的干支与日主的关系（十神）
+- 流年天干地支对原命局的吉凶影响
+- 当年的重点关注领域（事业/财运/感情/健康）
+- 如有冲合日柱或年柱，需特别说明其含义
+
+### 七、佩戴饰品与摆件建议
+根据命局五行平衡和喜用神，给出个性化的佩戴建议和家居/办公摆件建议：
+- 建议佩戴的材质（金/银/玉/木质等）和颜色
+- 适合的水晶或宝石种类
+- 适合摆放的物品（如水晶球、葫芦、五帝钱、貔貅等）
+- 吉祥方位布置建议
+
+### 八、综合建议
 给出实际可行的人生建议（事业、感情、健康等方面）。
 
 请使用标题分段，适当引用经典名句。语言要典雅但不晦涩，让现代读者能够理解和受益。`;
