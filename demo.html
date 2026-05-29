@@ -883,6 +883,17 @@ const ZHI_LIU_HE = { '子':'丑','丑':'子','寅':'亥','亥':'寅','卯':'戌'
 const ZHI_LIU_CHONG = { '子':'午','午':'子','丑':'未','未':'丑','寅':'申','申':'寅','卯':'酉','酉':'卯','辰':'戌','戌':'辰','巳':'亥','亥':'巳' };
 const ZHI_LIU_HAI = { '子':'未','未':'子','丑':'午','午':'丑','寅':'巳','巳':'寅','卯':'辰','辰':'卯','申':'亥','亥':'申','酉':'戌','戌':'酉' };
 
+function getFullZhiRelations(liuNianZhi, pillars) {
+  const rels = [];
+  for (const [col, zhi] of [['年', pillars.year.zhi], ['月', pillars.month.zhi], ['日', pillars.day.zhi], ['时', pillars.hour.zhi]]) {
+    if (!zhi) continue;
+    if (ZHI_LIU_HE[liuNianZhi] === zhi) rels.push(`合${col}支`);
+    if (ZHI_LIU_CHONG[liuNianZhi] === zhi) rels.push(`冲${col}支`);
+    if (ZHI_LIU_HAI[liuNianZhi] === zhi) rels.push(`害${col}支`);
+  }
+  return rels;
+}
+
 function getZhiRelationDesc(liuNianZhi, yearZhi, dayZhi) {
   const tags = [];
   if (ZHI_LIU_HE[liuNianZhi] === yearZhi) tags.push('合年支');
@@ -901,6 +912,48 @@ function getLiunianFortuneTag(liuNianGan, riGan) {
   if (good.includes(shiShen)) return { tag: '吉', cls: 'good' };
   if (bad.includes(shiShen)) return { tag: '平', cls: 'neutral' };
   return { tag: '平', cls: 'neutral' };
+}
+
+function getLiunianDetail(ln, r) {
+  const p = r.pillars;
+  const dm = r.dayMaster;
+  const shiShen = calcShiShen(dm.gan, ln.gan);
+  const naYinVal = getNaYin(ln.index);
+  const changShengName = getChangShengName(dm.gan, ln.zhi);
+  const cangGanArr = CANG_GAN[ln.zhi] || [];
+  const cangGanSS = cangGanArr.map(g => calcShiShen(dm.gan, g)).join('、');
+  const fullRels = getFullZhiRelations(ln.zhi, p);
+  const fortune = getLiunianFortuneTag(ln.gan, dm.gan);
+
+  // 生成该流年的重点关注
+  const focusAreas = [];
+  const hasChongRi = fullRels.some(r => r.includes('冲日'));
+  const hasHeRi = fullRels.some(r => r.includes('合日'));
+  const hasChongNian = fullRels.some(r => r.includes('冲年'));
+  const hasHeNian = fullRels.some(r => r.includes('合年'));
+  const hasHai = fullRels.some(r => r.includes('害'));
+  if (hasChongRi) { focusAreas.push('感情婚姻波动较大，注意夫妻关系'); }
+  if (hasHeRi) { focusAreas.push('人际关系顺畅，感情有新进展'); }
+  if (hasChongNian) { focusAreas.push('工作环境/住所易有变动'); }
+  if (hasHeNian) { focusAreas.push('家庭和睦，长辈助力'); }
+  if (hasHai) { focusAreas.push('防小人口舌，注意健康隐疾'); }
+  if (shiShen === '正官' || shiShen === '七杀') { focusAreas.push('事业压力增大，宜稳扎稳打'); }
+  if (shiShen === '正财' || shiShen === '偏财') { focusAreas.push('财运变化明显，注意理财'); }
+  if (shiShen === '正印' || shiShen === '偏印') { focusAreas.push('学习运旺，宜进修或考证'); }
+  if (shiShen === '食神' || shiShen === '伤官') { focusAreas.push('创意活跃，宜拓展副业'); }
+  if (shiShen === '比肩' || shiShen === '劫财') { focusAreas.push('人际应酬增多，注意合伙合作'); }
+  if (focusAreas.length === 0) { focusAreas.push('平稳过渡，蓄力之年'); }
+
+  // 长生十二宫解读
+  const csWarn = ['死','病','墓','绝'];
+  const csGood = ['长生','冠带','临官','帝旺'];
+  let csNote = '';
+  if (csGood.includes(changShengName)) csNote = `${changShengName}之位，气运上升`;
+  else if (csWarn.includes(changShengName)) csNote = `${changShengName}之地，宜守不宜攻`;
+  else if (changShengName === '沐浴') csNote = '沐浴桃花，感情丰富敏感';
+  else if (changShengName === '衰') csNote = '衰地需养精蓄锐';
+
+  return { shiShen, naYinVal, changShengName, cangGanArr, cangGanSS, fullRels, fortune, focusAreas, csNote };
 }
 
 // ===== 佩戴建议计算 =====
@@ -1097,33 +1150,43 @@ function renderResult(r) {
       <!-- 4. 流年运势 -->
       <div class="card result-card span-2">
         <h3>流 年 运 势</h3>
-        <table>
-          <tr><th>年份</th><th>流年干支</th><th>纳音</th><th>天干十神</th><th>与命局关系</th><th>运势</th></tr>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">
           ${(() => {
             const currentYear = new Date().getFullYear();
-            let rows = '';
+            let cards = '';
             for (let offset = 0; offset < 6; offset++) {
               const yr = currentYear + offset;
               const ln = calcLiuNian(yr);
-              const shiShen = calcShiShen(r.dayMaster.gan, ln.gan);
-              const relation = getZhiRelationDesc(ln.zhi, p.year.zhi, p.day.zhi);
-              const fortune = getLiunianFortuneTag(ln.gan, r.dayMaster.gan);
-              const naYinVal = getNaYin(ln.index);
+              const detail = getLiunianDetail(ln, r);
               const isThisYear = offset === 0;
-              return rows + `<tr class="${isThisYear ? 'current-row' : ''}">
-                <td style="font-weight:${isThisYear ? 'bold' : 'normal'};color:${isThisYear ? 'var(--gold-bright)' : 'var(--text)'}">${yr}年${isThisYear ? ' ←今年' : ''}</td>
-                <td style="font-family:var(--font-display);font-size:1.15em;color:var(--text-bright)">${ln.ganZhi}</td>
-                <td style="color:#78a8c8;font-size:0.82em">${naYinVal}</td>
-                <td style="color:var(--gold);font-size:0.85em">${shiShen}</td>
-                <td style="color:${relation === '—' ? 'var(--text-dim)' : '#d4a870'};font-size:0.82em">${relation}</td>
-                <td><span style="display:inline-block;padding:2px 10px;border-radius:2px;font-size:0.78em;${fortune.tag==='吉'?'background:rgba(90,158,124,0.15);color:#90c8a8':''}${fortune.tag==='平'?'background:rgba(200,160,60,0.12);color:var(--gold)':''}${fortune.tag==='凶'?'background:rgba(180,60,40,0.12);color:#d89080':''}">${fortune.tag}</span></td>
-              </tr>`;
+              const relsText = detail.fullRels.length > 0 ? detail.fullRels.join(' ') : '—';
+              cards += `<div style="background:${isThisYear ? 'rgba(200,160,60,0.06)' : 'rgba(200,160,60,0.02)'};padding:16px;border:1px solid ${isThisYear ? 'rgba(200,160,60,0.25)' : 'rgba(200,160,60,0.06)'};${isThisYear ? 'box-shadow:0 0 20px rgba(200,160,60,0.06);' : ''}">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                  <span style="font-family:var(--font-display);font-size:1.15em;color:${isThisYear ? 'var(--gold-bright)' : 'var(--text-bright)'}">
+                    ${yr}年 ${isThisYear ? '← 今年' : ''}
+                  </span>
+                  <span style="display:inline-block;padding:2px 10px;font-size:0.78em;${detail.fortune.tag === '吉' ? 'background:rgba(90,158,124,0.15);color:#90c8a8' : detail.fortune.tag === '平' ? 'background:rgba(200,160,60,0.12);color:var(--gold)' : 'background:rgba(180,60,40,0.12);color:#d89080'}">${detail.fortune.tag}</span>
+                </div>
+                <div style="font-family:var(--font-display);font-size:1.4em;color:var(--text-bright);margin-bottom:8px;letter-spacing:4px;text-align:center">
+                  ${ln.ganZhi}
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:0.8em;color:var(--text);margin-bottom:8px">
+                  <div>纳音：<span style="color:#78a8c8">${detail.naYinVal}</span></div>
+                  <div>天干十神：<span style="color:var(--gold)">${detail.shiShen}</span></div>
+                  <div>长生：<span style="color:var(--jade)">${detail.changShengName}</span></div>
+                  <div>藏干：<span style="color:var(--text-dim);font-size:0.92em">${detail.cangGanSS}</span></div>
+                </div>
+                <div style="font-size:0.78em;color:var(--text-dim);margin-bottom:8px;padding:6px 8px;background:rgba(0,0,0,0.15);line-height:1.6">
+                  <b>与命局关系：</b><span style="color:${relsText === '—' ? 'var(--text-dim)' : '#d4a870'}">${relsText}</span>
+                  <span style="color:var(--text-dim);margin-left:6px">${detail.csNote ? '· ' + detail.csNote : ''}</span>
+                </div>
+                <div style="font-size:0.78em;color:var(--text);line-height:1.7;padding-top:6px;border-top:1px solid var(--border)">
+                  ${detail.focusAreas.map(f => `<div style="margin-bottom:2px">⚡ ${f}</div>`).join('')}
+                </div>
+              </div>`;
             }
+            return cards;
           })()}
-        </table>
-        <div style="margin-top:12px;font-size:0.72em;color:var(--text-dim);line-height:1.8">
-          · 六合/六冲/六害以年支日支为准 · 天干十神取流年天干对日主 ·
-          <br>· 冲年支主环境变动 · 合日支主感情人际 ·
         </div>
       </div>
 
@@ -1313,12 +1376,24 @@ ${currentDY ? `\n👉 当前正处第${currentDY.step}步大运：${currentDY.ga
 ### 五、当前流年大运分析
 结合当前${currentYear}年${thisLN.ganZhi}流年、来年${currentYear + 1}年${nextLN.ganZhi}流年以及当前大运${currentDY ? currentDY.ganZhi : '未知'}，分析近期运势重点和注意事项。
 
-### 六、逐流年运势详批
-请对当前${currentYear}年至${currentYear + 5}年共6个流年分别解读：
-- 每个流年的干支与日主的关系（十神）
-- 流年天干地支对原命局的吉凶影响
-- 当年的重点关注领域（事业/财运/感情/健康）
-- 如有冲合日柱或年柱，需特别说明其含义
+### 六、逐流年运势详批（核心章节）
+请对当前${currentYear}年至${currentYear + 5}年共6个流年，逐一分年详细解读。
+每年请按以下框架展开：
+
+**${currentYear}年${thisLN.ganZhi}流年：**
+- 流年干支与日主关系（十神定性）
+- 纳音${getNaYin(thisLN.index)}对命局的五行生克影响
+- 地支与四柱的合冲害关系及其含义
+- 当年重点领域（事业/财运/感情/健康）的具体表现
+- 吉凶判断与应对建议
+
+**${currentYear + 1}年${nextLN.ganZhi}流年：**
+（同上框架）
+
+对后续各年依次展开。要求：
+- 每一年都要有具体的分析，不能一笔带过
+- 冲合日柱/年柱的年份要详细说明变动性质
+- 标注每年最需要注意的1-2件事
 
 ### 七、佩戴饰品与摆件建议
 根据命局五行平衡和喜用神，给出个性化的佩戴建议和家居/办公摆件建议：
