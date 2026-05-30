@@ -472,6 +472,74 @@
     margin: 8px 0;
     user-select: none;
   }
+
+  /* ── Payment modal ── */
+  .pay-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.82);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; opacity: 0; pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  .pay-overlay.active { opacity: 1; pointer-events: auto; }
+  .pay-card {
+    background: var(--card); border: 1px solid var(--border-glow);
+    padding: 32px 28px; max-width: 360px; width: 90%;
+    text-align: center; position: relative;
+  }
+  .pay-card .pay-close {
+    position: absolute; top: 10px; right: 14px;
+    background: none; border: none; color: var(--text-dim);
+    font-size: 1.2em; cursor: pointer;
+  }
+  .pay-card .pay-close:hover { color: var(--text-bright); }
+  .pay-card h3 {
+    font-family: var(--font-display); color: var(--gold-bright);
+    font-size: 1.3em; letter-spacing: 4px; margin-bottom: 8px;
+  }
+  .pay-card .pay-price {
+    font-size: 1.8em; color: var(--gold); font-weight: bold;
+    font-family: var(--font-display); margin-bottom: 16px;
+  }
+  .pay-card .pay-info {
+    font-size: 0.8em; color: var(--text-dim); margin-bottom: 16px; line-height: 1.8;
+  }
+  .pay-qr-wrap {
+    display: inline-block; padding: 12px; background: #fff;
+    margin-bottom: 16px;
+  }
+  .pay-qr-wrap img { display: block; width: 200px; height: 200px; }
+  .pay-qr-wrap .qr-placeholder {
+    width: 200px; height: 200px; display: flex; align-items: center;
+    justify-content: center; color: #999; font-size: 0.8em; text-align: center;
+    padding: 20px; line-height: 1.8;
+  }
+  .btn-paid {
+    background: var(--gold); color: var(--bg); border: none;
+    padding: 10px 40px; font-size: 1em; font-family: var(--font-display);
+    letter-spacing: 4px; cursor: pointer; width: 100%;
+    transition: background 0.2s;
+  }
+  .btn-paid:hover { background: var(--gold-bright); }
+  .btn-paid:disabled { opacity: 0.5; cursor: not-allowed; }
+  .pay-lock {
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    padding: 24px; border: 1px dashed var(--border-glow);
+    background: rgba(200,160,60,0.02); text-align: center;
+  }
+  .pay-lock .lock-icon {
+    font-size: 2em; color: var(--gold);
+  }
+  .pay-lock .lock-text {
+    color: var(--text-dim); font-size: 0.85em; line-height: 1.8;
+  }
+  .btn-unlock {
+    background: transparent; border: 1px solid var(--gold);
+    color: var(--gold); padding: 10px 32px;
+    font-family: var(--font-display); letter-spacing: 4px;
+    cursor: pointer; font-size: 0.95em;
+    transition: all 0.2s;
+  }
+  .btn-unlock:hover { background: rgba(200,160,60,0.1); color: var(--gold-bright); }
 </style>
 </head>
 <body>
@@ -1321,15 +1389,29 @@ function renderResult(r) {
       <div class="card result-card ai-card span-2" id="aiCard">
         <h3>命 理 解 读</h3>
         <div id="aiContent">
-          <p style="color:var(--text-dim);text-align:center;padding:16px">
-            点击下方按钮，为您深度解读命盘<br>
-            <span style="font-size:0.8em">涵盖：流年大运 · 姻缘情感 · 生活事业 · 财运</span>
-          </p>
-          <div style="text-align:center">
-            <button class="btn btn-ai" onclick="doAIAnalysis()" style="max-width:280px" id="btnAI">
-              开 始 解 读
-            </button>
-          </div>
+          ${isPersonPaid(r) ? `
+            <p style="color:var(--text-dim);text-align:center;padding:16px">
+              点击下方按钮，为您深度解读命盘<br>
+              <span style="font-size:0.8em">涵盖：流年大运 · 姻缘情感 · 生活事业 · 财运</span>
+            </p>
+            <div style="text-align:center">
+              <button class="btn btn-ai" onclick="doAIAnalysis()" style="max-width:280px" id="btnAI">
+                开 始 解 读
+              </button>
+            </div>
+          ` : `
+            <div class="pay-lock">
+              <div class="lock-icon">🔒</div>
+              <div class="lock-text">
+                命理解读需付费解锁<br>
+                <span style="font-size:0.85em;color:var(--gold)">¥ 0.99</span> · 微信/支付宝扫码<br>
+                <span style="font-size:0.75em">解锁后本命盘永久可读</span>
+              </div>
+              <button class="btn-unlock" onclick="showPayModal(window._baziResult)">
+                付 费 解 锁 · 查 看 解 读
+              </button>
+            </div>
+          `}
         </div>
       </div>
 
@@ -1344,11 +1426,17 @@ function renderResult(r) {
 
 // ===== DeepSeek AI 分析 =====
 window.doAIAnalysis = async function() {
-  const DEFAULT_KEY = 'sk-da21654a111c42fdb7ffbd02eeccf548';
-  const apiKey = document.getElementById('apiKey').value.trim() || DEFAULT_KEY;
-
   const r = window._baziResult;
   if (!r) return;
+
+  // 付费检查
+  if (!isPersonPaid(r)) {
+    showPayModal(r);
+    return;
+  }
+
+  const DEFAULT_KEY = 'sk-da21654a111c42fdb7ffbd02eeccf548';
+  const apiKey = document.getElementById('apiKey').value.trim() || DEFAULT_KEY;
 
   const btnAI = document.getElementById('btnAI');
   const aiContent = document.getElementById('aiContent');
@@ -1403,6 +1491,22 @@ window.doAIAnalysis = async function() {
       </div>`;
   }
 };
+
+// Update AI card content after payment
+function renderAiSection(r) {
+  const aiContent = document.getElementById('aiContent');
+  if (!aiContent) return;
+  aiContent.innerHTML = `
+    <p style="color:var(--text-dim);text-align:center;padding:16px">
+      点击下方按钮，为您深度解读命盘<br>
+      <span style="font-size:0.8em">涵盖：流年大运 · 姻缘情感 · 生活事业 · 财运</span>
+    </p>
+    <div style="text-align:center">
+      <button class="btn btn-ai" onclick="doAIAnalysis()" style="max-width:280px" id="btnAI">
+        开 始 解 读
+      </button>
+    </div>`;
+}
 
 function buildAnalysisPrompt(r) {
   const p = r.pillars;
@@ -1588,5 +1692,88 @@ if ('serviceWorker' in navigator) {
     .catch(err => console.log('PWA: Service Worker 注册失败', err));
 }
 </script>
+
+<!-- ── Payment Modal ── -->
+<div class="pay-overlay" id="payOverlay">
+  <div class="pay-card">
+    <button class="pay-close" onclick="closePayModal()" title="关闭">✕</button>
+    <h3>解 锁 命 理 分 析</h3>
+    <div class="pay-price">¥ 0.99</div>
+    <div class="pay-info">
+      微信 / 支付宝扫码支付<br>
+      支付后点击下方按钮解锁<br>
+      <span style="font-size:0.85em;color:#8a7a64">每份命盘独立计费</span>
+    </div>
+    <div class="pay-qr-wrap" id="payQrWrap">
+      <img id="payQrImg" src="" alt="付款码" style="display:none" onload="this.style.display='block';var ph=document.getElementById('qrPlaceholder');if(ph)ph.style.display='none'">
+      <div class="qr-placeholder" id="qrPlaceholder">
+        ⚠️ 请替换为你的<br>微信/支付宝收款码<br><br>
+        设置方式：<br>将收款码图片替换<br><code style="background:#eee;padding:2px 6px;font-size:0.9em">PAY_QR_URL</code>
+      </div>
+    </div>
+    <button class="btn-paid" id="btnPaid" onclick="unlockAnalysis()">
+      我 已 支 付 · 解 锁 解 读
+    </button>
+    <div style="margin-top:10px;font-size:0.7em;color:var(--text-dim)">
+      解锁后当前命盘永久可读
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== Payment config =====
+// 替换为你的微信/支付宝收款码图片URL（截图后上传到图床或转为base64）
+const PAY_QR_URL = '';
+
+function personKey(r) {
+  return 'bazi_paid_' + btoa(encodeURIComponent(
+    [r.input.name, r.input.year, r.input.month, r.input.day, r.input.hour, r.input.sex].join('|')
+  )).replace(/[+/=]/g, '');
+}
+
+function isPersonPaid(r) {
+  try { return localStorage.getItem(personKey(r)) === '1'; } catch(e) { return false; }
+}
+
+function markPersonPaid(r) {
+  try { localStorage.setItem(personKey(r), '1'); } catch(e) {}
+}
+
+function showPayModal(r) {
+  var overlay = document.getElementById('payOverlay');
+  var img = document.getElementById('payQrImg');
+  var ph = document.getElementById('qrPlaceholder');
+  if (PAY_QR_URL) {
+    img.src = PAY_QR_URL;
+    img.style.display = 'block';
+    if (ph) ph.style.display = 'none';
+  } else {
+    img.style.display = 'none';
+    if (ph) ph.style.display = 'flex';
+  }
+  overlay._currentResult = r;
+  overlay.classList.add('active');
+}
+
+function closePayModal() {
+  document.getElementById('payOverlay').classList.remove('active');
+}
+
+function unlockAnalysis() {
+  var overlay = document.getElementById('payOverlay');
+  var r = overlay._currentResult;
+  if (r) {
+    markPersonPaid(r);
+    closePayModal();
+    renderAiSection(r);
+  }
+}
+
+// Close modal on overlay click
+document.getElementById('payOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closePayModal();
+});
+</script>
+
 </body>
 </html>
