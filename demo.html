@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>四柱八字排盘 · 命理分析</title>
+<script src="config.js"></script>
 
 <!-- PWA Meta Tags -->
 <link rel="manifest" href="./manifest.json">
@@ -574,13 +575,6 @@
     </div>
     <button class="btn" onclick="doPaiPan()">开 始 排 盘</button>
 
-    <div class="form-group">
-      <label>API Key</label>
-      <input type="password" id="apiKey" placeholder="输入你的 DeepSeek API Key" style="font-size:0.75em;letter-spacing:0">
-      <div style="font-size:0.65em;color:var(--text-dim);margin-top:4px">
-        在 <a href="https://platform.deepseek.com/api_keys" target="_blank" style="color:var(--gold);opacity:0.7">platform.deepseek.com</a> 免费获取
-      </div>
-    </div>
   </div>
 
   <div id="result"></div>
@@ -1444,12 +1438,7 @@ window.doAIAnalysis = async function() {
   const btnAI = document.getElementById('btnAI');
   const aiContent = document.getElementById('aiContent');
 
-  const apiKey = document.getElementById('apiKey').value.trim();
-  if (!apiKey) {
-    aiContent.innerHTML = '<div class="error" style="margin:8px 0">请先在排盘表单中输入 DeepSeek API Key<br><span style="font-size:0.8em">免费获取：<a href="https://platform.deepseek.com/api_keys" target="_blank">platform.deepseek.com/api_keys</a></span></div>';
-    btnAI.disabled = false;
-    return;
-  }
+  const apiKey = (typeof DEEPSEEK_API_KEY !== 'undefined') ? DEEPSEEK_API_KEY : '';
   btnAI.disabled = true;
   aiContent.innerHTML = `
     <div class="loading-spinner">
