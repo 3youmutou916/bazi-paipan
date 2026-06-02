@@ -1439,6 +1439,43 @@ function renderResult(r) {
   window._baziResult = r;
 }
 
+// ===== Payment return check =====
+(function() {
+  if (window.location.search.indexOf('mpaid=1') >= 0) {
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf('mbd_pending_') === 0) {
+        try {
+          var data = JSON.parse(localStorage.getItem(k));
+          if (Date.now() - data.ts < 30 * 60 * 1000) {
+            var paidKey = k.replace('mbd_pending_', '');
+            localStorage.setItem(paidKey, '1');
+            localStorage.removeItem(k);
+            var nameEl = document.getElementById('name');
+            var yearEl = document.getElementById('year');
+            var monthEl = document.getElementById('month');
+            var dayEl = document.getElementById('day');
+            var hourEl = document.getElementById('hour');
+            var sexEl = document.getElementById('sex');
+            if (nameEl) nameEl.value = data.name || '';
+            if (yearEl) yearEl.value = data.year || '';
+            if (monthEl) monthEl.value = data.month || '';
+            if (dayEl) dayEl.value = data.day || '';
+            if (hourEl) hourEl.value = data.hour || 0;
+            if (sexEl) sexEl.value = data.sex || '男';
+            setTimeout(function() { if (window.doPaiPan) window.doPaiPan(); }, 300);
+          } else {
+            localStorage.removeItem(k);
+          }
+        } catch(e) { localStorage.removeItem(k); }
+      }
+    }
+  }
+})();
+
 // ===== DeepSeek AI 分析 =====
 window.doAIAnalysis = async function() {
   const r = window._baziResult;
@@ -1787,6 +1824,18 @@ function markPersonPaid(r) {
 }
 
 function showPayModal(r) {
+  // 如果配置了面包多支付链接，跳转支付
+  if (typeof MBD_PAY_URL !== 'undefined' && MBD_PAY_URL) {
+    var key = personKey(r);
+    var pendingData = {
+      name: r.input.name, year: r.input.year, month: r.input.month,
+      day: r.input.day, hour: r.input.hour, sex: r.input.sex, ts: Date.now()
+    };
+    try { localStorage.setItem('mbd_pending_' + key, JSON.stringify(pendingData)); } catch(e) {}
+    window.location.href = MBD_PAY_URL;
+    return;
+  }
+  // 降级：二维码弹窗
   var overlay = document.getElementById('payOverlay');
   var img = document.getElementById('payQrImg');
   var info = document.getElementById('payInfo');
@@ -1797,11 +1846,11 @@ function showPayModal(r) {
   var label = document.getElementById('payMethodLabel');
   img.src = (typeof PAY_WX_QR !== 'undefined') ? PAY_WX_QR : '';
   label.textContent = '微信扫一扫支付 ¥0.99';
-  tabWx.classList.add('active');
-  tabZfb.classList.remove('active');
+  if (tabWx) tabWx.classList.add('active');
+  if (tabZfb) tabZfb.classList.remove('active');
   info.textContent = '请扫码支付 ¥0.99';
-  checkbox.checked = false;
-  btnPaid.disabled = true;
+  if (checkbox) checkbox.checked = false;
+  if (btnPaid) btnPaid.disabled = true;
   overlay._currentResult = r;
   overlay.classList.add('active');
 }
