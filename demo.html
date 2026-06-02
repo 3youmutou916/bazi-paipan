@@ -1750,6 +1750,59 @@ function selectPayMethod(method) {
 }
 
 function personKey(r) {
+  return 'bazi_paid_' + btoa(encodeURIComponent(
+    [r.input.name, r.input.year, r.input.month, r.input.day, r.input.hour, r.input.sex].join('|')
+  )).replace(/[+/=]/g, '');
+}
 
+function isPersonPaid(r) {
+  try { return localStorage.getItem(personKey(r)) === '1'; } catch(e) { return false; }
+}
+
+function markPersonPaid(r) {
+  try { localStorage.setItem(personKey(r), '1'); } catch(e) {}
+}
+
+function showPayModal(r) {
+  var overlay = document.getElementById('payOverlay');
+  var selectArea = document.getElementById('payMethodSelect');
+  var qrArea = document.getElementById('payQrArea');
+  var img = document.getElementById('payQrImg');
+  var info = document.getElementById('payInfo');
+  selectArea.style.display = 'flex';
+  qrArea.style.display = 'none';
+  img.src = '';
+  info.textContent = '请选择支付方式';
+  overlay._currentResult = r;
+  overlay.classList.add('active');
+}
+
+function closePayModal() {
+  document.getElementById('payOverlay').classList.remove('active');
+}
+
+function unlockAnalysis() {
+  var overlay = document.getElementById('payOverlay');
+  var r = overlay._currentResult;
+  if (r) {
+    markPersonPaid(r);
+    closePayModal();
+    renderAiSection(r);
+  }
+}
+
+document.getElementById('payOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closePayModal();
+});
+</script>
+
+<!-- Service Worker Registration -->
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js')
+    .then(reg => console.log('PWA: Service Worker 已注册', reg.scope))
+    .catch(err => console.log('PWA: Service Worker 注册失败', err));
+}
+</script>
 </body>
 </html>
