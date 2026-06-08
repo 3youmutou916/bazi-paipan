@@ -1860,25 +1860,28 @@ function markPersonPaid(r) {
 }
 
 function showPayModal(r) {
-  // Store QR images in localStorage for pay.html
-  try {
-    if (typeof PAY_WX_QR !== 'undefined') localStorage.setItem('pay_qr_wx', PAY_WX_QR);
-    if (typeof PAY_ZFB_QR !== 'undefined') localStorage.setItem('pay_qr_zfb', PAY_ZFB_QR);
-  } catch(e) {}
+  var overlay = document.getElementById('payOverlay');
+  var img = document.getElementById('payQrImg');
+  var info = document.getElementById('payInfo');
+  var txnInput = document.getElementById('payTxnInput');
+  var btnPaid = document.getElementById('btnPaid');
+  var tabWx = document.getElementById('tabWx');
+  var tabZfb = document.getElementById('tabZfb');
+  var label = document.getElementById('payMethodLabel');
 
-  // Store person data
-  var hash = btoa(encodeURIComponent(
-    [r.input.name, r.input.year, r.input.month, r.input.day, r.input.hour, r.input.sex].join('|')
-  )).replace(/[+\/=]/g, '');
-  var payData = {
-    name: r.input.name, year: r.input.year, month: r.input.month,
-    day: r.input.day, hour: r.input.hour, sex: r.input.sex,
-    hash: hash, ts: Date.now()
-  };
-  try { localStorage.setItem('mbd_pay_data', JSON.stringify(payData)); } catch(e) {}
+  // Default to WeChat QR
+  if (typeof PAY_WX_QR !== 'undefined') img.src = PAY_WX_QR;
+  label.textContent = '微信扫一扫支付 ¥0.99';
+  if (tabWx) tabWx.classList.add('active');
+  if (tabZfb) tabZfb.classList.remove('active');
+  info.textContent = '请扫码支付 ¥0.99，完成后粘贴交易单号';
 
-  // Redirect to payment page
-  window.location.href = './pay.html%23' + encodeURIComponent(JSON.stringify(payData));
+  // Reset inputs
+  if (txnInput) txnInput.value = '';
+  if (btnPaid) btnPaid.disabled = true;
+
+  overlay._currentResult = r;
+  overlay.classList.add('active');
 }
 
 function closePayModal() {
