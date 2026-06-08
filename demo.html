@@ -1425,6 +1425,7 @@ function renderResult(r) {
               <button class="btn-unlock" onclick="showPayModal(window._baziResult)">
                 付 费 解 锁 · 查 看 解 读
               </button>
+              <div style="font-size:0.72em;color:#5a4a30;margin-top:6px">将跳转至面包多支付 ¥0.99，付完自动返回解锁</div>
             </div>
           `}
         </div>
@@ -1441,10 +1442,18 @@ function renderResult(r) {
 
 // ===== Payment return check =====
 (function() {
-  if (window.location.search.indexOf('mpaid=1') >= 0) {
+  // Check if returning from payment (面包多 or other payment service)
+  var search = window.location.search;
+  if (search.indexOf('mbd_paid=1') >= 0) {
+    // Clean URL
     if (window.history && window.history.replaceState) {
       window.history.replaceState({}, '', window.location.pathname);
     }
+    // Check referrer (optional extra verification)
+    var fromPayment = document.referrer.indexOf('mbd.pub') >= 0 ||
+                      document.referrer.indexOf('p.mbd.pub') >= 0;
+
+    // Find pending payment
     for (var i = 0; i < localStorage.length; i++) {
       var k = localStorage.key(i);
       if (k && k.indexOf('mbd_pending_') === 0) {
@@ -1454,6 +1463,7 @@ function renderResult(r) {
             var paidKey = k.replace('mbd_pending_', '');
             localStorage.setItem(paidKey, '1');
             localStorage.removeItem(k);
+            // Auto-fill form and calculate
             var nameEl = document.getElementById('name');
             var yearEl = document.getElementById('year');
             var monthEl = document.getElementById('month');
