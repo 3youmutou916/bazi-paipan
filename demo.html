@@ -1765,8 +1765,11 @@ if ('serviceWorker' in navigator) {
       </div>
       <div style="font-size:0.85em;color:#c9a050;margin-bottom:6px" id="payMethodLabel"></div>
 
-      <label class="pay-check">
-        <input type="checkbox" id="payCheckbox" onchange="onPayCheckChange()"> 我已完成扫码支付
+      <label class="pay-check" style="display:block;text-align:center;margin-bottom:8px">
+        <div style="font-size:0.75em;color:#8a7a64;margin-bottom:6px">支付后请粘贴微信/支付宝账单中的<text style="color:#d4a870">交易单号</text></div>
+        <input type="text" id="payTxnInput" placeholder="请粘贴交易单号（至少8位）" maxlength="30"
+          style="width:100%;padding:10px 14px;background:#14100b;border:1px solid #3a2e1e;color:#e8d8c0;font-size:0.82em;text-align:center;letter-spacing:1px"
+          oninput="var btn=document.getElementById('btnPaid');if(btn)btn.disabled=this.value.trim().length<8">
       </label>
 
       <button class="btn-paid" id="btnPaid" onclick="unlockAnalysis()" disabled>
@@ -1803,12 +1806,6 @@ function selectPayMethod(method) {
   }
 }
 
-function onPayCheckChange() {
-  var checkbox = document.getElementById('payCheckbox');
-  var btnPaid = document.getElementById('btnPaid');
-  btnPaid.disabled = !checkbox.checked;
-}
-
 function personKey(r) {
   return 'bazi_paid_' + btoa(encodeURIComponent(
     [r.input.name, r.input.year, r.input.month, r.input.day, r.input.hour, r.input.sex].join('|')
@@ -1839,17 +1836,8 @@ function showPayModal(r) {
   var overlay = document.getElementById('payOverlay');
   var img = document.getElementById('payQrImg');
   var info = document.getElementById('payInfo');
-  var checkbox = document.getElementById('payCheckbox');
-  var btnPaid = document.getElementById('btnPaid');
-  var tabWx = document.getElementById('tabWx');
-  var tabZfb = document.getElementById('tabZfb');
-  var label = document.getElementById('payMethodLabel');
-  img.src = (typeof PAY_WX_QR !== 'undefined') ? PAY_WX_QR : '';
-  label.textContent = '微信扫一扫支付 ¥0.99';
-  if (tabWx) tabWx.classList.add('active');
-  if (tabZfb) tabZfb.classList.remove('active');
-  info.textContent = '请扫码支付 ¥0.99';
-  if (checkbox) checkbox.checked = false;
+  var txnInput = document.getElementById('payTxnInput');
+  if (txnInput) txnInput.value = '';
   if (btnPaid) btnPaid.disabled = true;
   overlay._currentResult = r;
   overlay.classList.add('active');
@@ -1861,8 +1849,12 @@ function closePayModal() {
 
 function unlockAnalysis() {
   var overlay = document.getElementById('payOverlay');
+  var txnInput = document.getElementById('payTxnInput');
   var r = overlay._currentResult;
   if (r) {
+    var txn = txnInput ? txnInput.value.trim() : '';
+    if (txn.length < 8) return;
+    try { localStorage.setItem(personKey(r) + '_txn', txn); } catch(e) {}
     markPersonPaid(r);
     closePayModal();
     renderAiSection(r);
