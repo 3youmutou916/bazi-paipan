@@ -1456,7 +1456,35 @@ function renderResult(r) {
     // Find pending payment
     for (var i = 0; i < localStorage.length; i++) {
       var k = localStorage.key(i);
-      if (k && k.indexOf('mbd_pending_') === 0) {
+      if (k && (k.indexOf('mbd_pending_') === 0 || k.indexOf('mbd_pay_data') === 0 || k.indexOf('pay_qr_') === 0)) {
+        if (k.indexOf('pay_qr_') === 0) continue; // skip QR storage
+        if (k.indexOf('mbd_pay_data') === 0) {
+          try {
+            var data = JSON.parse(localStorage.getItem(k));
+            if (Date.now() - data.ts < 30 * 60 * 1000) {
+              var paidKey = 'bazi_paid_' + data.hash;
+              localStorage.setItem(paidKey, '1');
+              localStorage.removeItem(k);
+              var nameEl = document.getElementById('name');
+              var yearEl = document.getElementById('year');
+              var monthEl = document.getElementById('month');
+              var dayEl = document.getElementById('day');
+              var hourEl = document.getElementById('hour');
+              var sexEl = document.getElementById('sex');
+              if (nameEl) nameEl.value = data.name || '';
+              if (yearEl) yearEl.value = data.year || '';
+              if (monthEl) monthEl.value = data.month || '';
+              if (dayEl) dayEl.value = data.day || '';
+              if (hourEl) hourEl.value = data.hour || 0;
+              if (sexEl) sexEl.value = data.sex || '';
+              setTimeout(function() { if (window.doPaiPan) window.doPaiPan(); }, 300);
+            } else {
+              localStorage.removeItem(k);
+            }
+          } catch(e) { localStorage.removeItem(k); }
+          continue;
+        }
+        if (k.indexOf('mbd_pending_') === 0) {
         try {
           var data = JSON.parse(localStorage.getItem(k));
           if (Date.now() - data.ts < 30 * 60 * 1000) {
@@ -1483,6 +1511,7 @@ function renderResult(r) {
         } catch(e) { localStorage.removeItem(k); }
       }
     }
+  }
   }
 })();
 
@@ -1831,26 +1860,25 @@ function markPersonPaid(r) {
 }
 
 function showPayModal(r) {
-  // 如果配置了面包多支付链接，跳转支付
-  if (typeof MBD_PAY_URL !== 'undefined' && MBD_PAY_URL) {
-    var key = personKey(r);
-    var pendingData = {
-      name: r.input.name, year: r.input.year, month: r.input.month,
-      day: r.input.day, hour: r.input.hour, sex: r.input.sex, ts: Date.now()
-    };
-    try { localStorage.setItem('mbd_pending_' + key, JSON.stringify(pendingData)); } catch(e) {}
-    window.location.href = MBD_PAY_URL;
-    return;
-  }
-  // 降级：二维码弹窗
-  var overlay = document.getElementById('payOverlay');
-  var img = document.getElementById('payQrImg');
-  var info = document.getElementById('payInfo');
-  var txnInput = document.getElementById('payTxnInput');
-  if (txnInput) txnInput.value = '';
-  if (btnPaid) btnPaid.disabled = true;
-  overlay._currentResult = r;
-  overlay.classList.add('active');
+  // Store QR images in localStorage for pay.html
+  try {
+    if (typeof PAY_WX_QR !== 'undefined') localStorage.setItem('pay_qr_wx', PAY_WX_QR);
+    if (typeof PAY_ZFB_QR !== 'undefined') localStorage.setItem('pay_qr_zfb', PAY_ZFB_QR);
+  } catch(e) {}
+
+  // Store person data
+  var hash = btoa(encodeURIComponent(
+    [r.input.name, r.input.year, r.input.month, r.input.day, r.input.hour, r.input.sex].join('|')
+  )).replace(/[+\/=]/g, '');
+  var payData = {
+    name: r.input.name, year: r.input.year, month: r.input.month,
+    day: r.input.day, hour: r.input.hour, sex: r.input.sex,
+    hash: hash, ts: Date.now()
+  };
+  try { localStorage.setItem('mbd_pay_data', JSON.stringify(payData)); } catch(e) {}
+
+  // Redirect to payment page
+  window.location.href = './pay.html%23' + encodeURIComponent(JSON.stringify(payData));
 }
 
 function closePayModal() {
